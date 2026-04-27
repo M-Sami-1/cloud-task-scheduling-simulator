@@ -12,13 +12,15 @@ class Plotter:
             "FCFS": "#165DFF",
             "SJF": "#22A559",
             "EFT": "#FF9F1A",
+            "Min-Min": "#8B5CF6",
+            "Max-Min": "#EF4444",
         }
 
     def draw_algorithm_metric_chart(self, canvas: tk.Canvas, results: list[ScheduleResult], metric_key: str, y_label: str) -> None:
         canvas.delete("all")
         width = max(canvas.winfo_width(), int(canvas.cget("width")))
         height = max(canvas.winfo_height(), int(canvas.cget("height")))
-        margin_left, margin_right, margin_top, margin_bottom = 56, 28, 20, 42
+        margin_left, margin_right, margin_top, margin_bottom = 56, 24, 30, 30
         chart_w = width - margin_left - margin_right
         chart_h = height - margin_top - margin_bottom
 
@@ -34,9 +36,8 @@ class Plotter:
         x_step = chart_w / max(len(values), 1)
         for index, (label, value) in enumerate(zip(labels, values)):
             x = margin_left + (index + 0.5) * x_step
-            y = margin_top + chart_h - ((value / max_value) * (chart_h - 20))
+            y = margin_top + chart_h - ((value / max_value) * (chart_h - 18))
             point_positions.append((x, y))
-            canvas.create_text(x, margin_top + chart_h + 18, text=label, fill="#374151", font=("Segoe UI", 9, "bold"))
 
         if len(point_positions) > 1:
             flat_points = [coordinate for point in point_positions for coordinate in point]
@@ -47,7 +48,7 @@ class Plotter:
             canvas.create_oval(x - 6, y - 6, x + 6, y + 6, fill=color, outline="white", width=2)
             canvas.create_text(
                 x,
-                y - 16,
+                y - 14,
                 text=f"{value:.3f}" if metric_key != "makespan" else f"{value:.1f}",
                 fill="#111827",
                 font=("Segoe UI", 8, "bold"),
@@ -56,7 +57,7 @@ class Plotter:
         legend_x = margin_left + 8
         for index, label in enumerate(labels):
             color = self.algorithm_colors.get(label, "#2563eb")
-            item_x = legend_x + index * 88
+            item_x = legend_x + index * 96
             canvas.create_rectangle(item_x, 6, item_x + 16, 16, fill=color, outline=color)
             canvas.create_text(item_x + 22, 11, text=label, anchor="w", fill="#374151", font=("Segoe UI", 9, "bold"))
 
@@ -64,36 +65,60 @@ class Plotter:
         canvas.delete("all")
         width = max(canvas.winfo_width(), int(canvas.cget("width")))
         height = max(canvas.winfo_height(), int(canvas.cget("height")))
-        margin_left, margin_right, margin_top, margin_bottom = 52, 22, 16, 64
+        margin_left, margin_right, margin_top, margin_bottom = 58, 18, 34, 48
         chart_w = width - margin_left - margin_right
         chart_h = height - margin_top - margin_bottom
 
         utilization = result.metrics["vm_utilization"]
         vm_ids = list(utilization.keys())
         values = [float(utilization[vm_id]) for vm_id in vm_ids]
+
+        if not values:
+            canvas.create_text(
+                width / 2,
+                height / 2,
+                text="No VM utilization data available",
+                fill="#64748b",
+                font=("Segoe UI", 10, "bold"),
+            )
+            return
+
         max_value = max(values) if values else 1.0
         max_value = max(max_value, 1.0)
 
+        canvas.create_text(
+            margin_left,
+            10,
+            text=f"Algorithm: {result.algorithm}",
+            anchor="w",
+            fill="#0f172a",
+            font=("Segoe UI Semibold", 11),
+        )
         self._draw_panel_axes(canvas, margin_left, margin_top, chart_w, chart_h, "Util.")
-        canvas.create_text(margin_left, 6, text=f"Algorithm: {result.algorithm}", anchor="w", fill="#6b7280", font=("Segoe UI", 9, "bold"))
 
         bar_space = chart_w / max(len(values), 1)
-        bar_width = bar_space * 0.5
+        bar_width = bar_space * 0.55
         for index, (vm_id, value) in enumerate(zip(vm_ids, values)):
             x_center = margin_left + (index + 0.5) * bar_space
-            bar_height = (value / max_value) * (chart_h - 24)
+            bar_height = (value / max_value) * (chart_h - 18)
             x0 = x_center - bar_width / 2
             y0 = margin_top + chart_h - bar_height
             x1 = x_center + bar_width / 2
             y1 = margin_top + chart_h
             canvas.create_rectangle(x0, y0, x1, y1, fill="#2f7cf6", outline="#1b4db2")
-            canvas.create_text(x_center, y0 - 10, text=f"{value:.3f}", fill="#111827", font=("Segoe UI", 8, "bold"))
-            canvas.create_text(x_center, margin_top + chart_h + 16, text=vm_id, fill="#374151", font=("Segoe UI", 8, "bold"))
+            canvas.create_text(
+                x_center,
+                y0 - 10,
+                text=f"{value:.3f}",
+                fill="#111827",
+                font=("Segoe UI", 8, "bold"),
+            )
+            canvas.create_text(x_center, margin_top + chart_h + 11, text=vm_id, fill="#374151", font=("Segoe UI", 8, "bold"))
 
     def show_result_window(self, parent: tk.Tk | tk.Toplevel, result: ScheduleResult) -> tk.Toplevel:
         window = tk.Toplevel(parent)
         window.title(f"{result.algorithm} - Detailed View")
-        window.geometry("1120x840")
+        window.geometry("1500x940")
         window.configure(bg="#eef3fb")
 
         canvas = tk.Canvas(window, bg="#eef3fb", highlightthickness=0)
@@ -178,7 +203,7 @@ class Plotter:
         selected = next((result for result in results if result.algorithm == selected_algorithm), results[0])
         window = tk.Toplevel(parent)
         window.title("Simulation Results")
-        window.geometry("1220x860")
+        window.geometry("1920x1040")
         window.configure(bg="#eef3fb")
 
         wrapper = tk.Frame(window, bg="#eef3fb")
@@ -195,7 +220,7 @@ class Plotter:
             card = tk.Frame(wrapper, bg="#ffffff", highlightthickness=1, highlightbackground="#dce5f3")
             card.pack(fill="x", pady=(0, 14))
             tk.Label(card, text=heading, bg="#ffffff", fg="#111827", font=("Segoe UI Semibold", 12)).pack(anchor="w", padx=16, pady=(12, 8))
-            canvas = tk.Canvas(card, width=1120, height=220 if key != "utilization" else 280, bg="#ffffff", highlightthickness=0)
+            canvas = tk.Canvas(card, width=1820, height=300 if key != "utilization" else 380, bg="#ffffff", highlightthickness=0)
             canvas.pack(fill="both", expand=True, padx=12, pady=(0, 12))
             if key == "makespan":
                 self.draw_algorithm_metric_chart(canvas, results, "makespan", label)
@@ -221,10 +246,43 @@ class Plotter:
 
         return window
 
+    def show_vm_utilization_window(self, parent: tk.Tk | tk.Toplevel, result: ScheduleResult) -> tk.Toplevel:
+        window = tk.Toplevel(parent)
+        window.title(f"VM Utilization Snapshot - {result.algorithm}")
+        window.geometry("1700x760")
+        window.configure(bg="#eef3fb")
+
+        outer = tk.Frame(window, bg="#eef3fb")
+        outer.pack(fill="both", expand=True, padx=18, pady=18)
+
+        header = tk.Frame(outer, bg="#ffffff", highlightthickness=1, highlightbackground="#dce5f3")
+        header.pack(fill="x", pady=(0, 14))
+        inner = tk.Frame(header, bg="#ffffff", padx=18, pady=14)
+        inner.pack(fill="both", expand=True)
+
+        tk.Label(inner, text=f"VM Utilization Snapshot - {result.algorithm}", bg="#ffffff", fg="#0f172a", font=("Segoe UI Semibold", 18)).pack(anchor="w")
+        tk.Label(
+            inner,
+            text="Complete utilization view for every VM in the selected scheduling result.",
+            bg="#ffffff",
+            fg="#64748b",
+            font=("Segoe UI", 10),
+        ).pack(anchor="w", pady=(4, 0))
+
+        card = tk.Frame(outer, bg="#ffffff", highlightthickness=1, highlightbackground="#dce5f3")
+        card.pack(fill="both", expand=True)
+        tk.Label(card, text="Complete VM Utilization Chart", bg="#ffffff", fg="#0f172a", font=("Segoe UI Semibold", 12)).pack(anchor="w", padx=16, pady=(12, 8))
+
+        canvas = tk.Canvas(card, width=1620, height=560, bg="#ffffff", highlightthickness=0)
+        canvas.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+        self.draw_vm_utilization_chart(canvas, result)
+
+        return window
+
     def show_timeline_window(self, parent: tk.Tk | tk.Toplevel, result: ScheduleResult) -> tk.Toplevel:
         window = tk.Toplevel(parent)
         window.title(f"Execution Timeline - {result.algorithm}")
-        window.geometry("1180x560")
+        window.geometry("1760x680")
         window.configure(bg="#eef3fb")
 
         card = tk.Frame(window, bg="#ffffff", highlightthickness=1, highlightbackground="#dce5f3")

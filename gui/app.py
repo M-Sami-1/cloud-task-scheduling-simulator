@@ -35,8 +35,12 @@ class SchedulerApp:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
         self.root.title("Task Scheduling in Cloud Computing")
-        self.root.geometry("1720x980")
-        self.root.minsize(1320, 860)
+        screen_w = self.root.winfo_screenwidth()
+        screen_h = self.root.winfo_screenheight()
+        window_w = min(1800, max(1500, screen_w - 120))
+        window_h = min(1120, max(980, screen_h - 60))
+        self.root.geometry(f"{window_w}x{window_h}")
+        self.root.minsize(1500, 980)
         self.root.configure(bg=self.BG)
 
         self.scheduler = Scheduler()
@@ -111,7 +115,7 @@ class SchedulerApp:
             self.shell_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
     def _build_header(self) -> None:
-        header = tk.Frame(self.content, bg=self.HEADER, height=72)
+        header = tk.Frame(self.content, bg=self.HEADER, height=58)
         header.pack(fill="x")
         header.pack_propagate(False)
 
@@ -122,7 +126,7 @@ class SchedulerApp:
             text="Task Scheduling in Cloud Computing",
             bg=self.HEADER,
             fg="#ffffff",
-            font=("Segoe UI Semibold", 20),
+            font=("Segoe UI Semibold", 17),
         ).pack(anchor="w")
 
     def _build_experiment_card(self) -> None:
@@ -247,7 +251,7 @@ class SchedulerApp:
         left = tk.Frame(dashboard, bg=self.BG)
         left.pack(side="left", fill="both", expand=True, padx=(0, 16))
 
-        right = tk.Frame(dashboard, bg=self.BG, width=760)
+        right = tk.Frame(dashboard, bg=self.BG, width=900)
         right.pack(side="left", fill="y")
         right.pack_propagate(False)
 
@@ -257,12 +261,12 @@ class SchedulerApp:
     def _build_summary_card(self, parent: tk.Widget) -> None:
         self.summary_card = self._card(parent)
         self.summary_card.pack(fill="both", expand=True)
-        header = tk.Frame(self.summary_card, bg=self.CARD, padx=20, pady=16)
+        header = tk.Frame(self.summary_card, bg=self.CARD, padx=18, pady=12)
         header.pack(fill="x")
         tk.Label(header, textvariable=self.summary_name_var, bg=self.CARD, fg=self.TEXT, font=("Segoe UI Semibold", 15)).pack(side="left")
         tk.Label(header, textvariable=self.status_var, bg=self.CARD, fg=self.MUTED, font=("Segoe UI", 10)).pack(side="right")
 
-        table_shell = tk.Frame(self.summary_card, bg=self.CARD, padx=16, pady=4)
+        table_shell = tk.Frame(self.summary_card, bg=self.CARD, padx=16, pady=2)
         table_shell.pack(fill="both", expand=True)
         self.table_header = tk.Frame(table_shell, bg="#eaf2fb", highlightthickness=1, highlightbackground=self.BORDER)
         self.table_header.pack(fill="x")
@@ -271,7 +275,7 @@ class SchedulerApp:
 
         self._build_table_header(self.table_header)
 
-        actions = tk.Frame(self.summary_card, bg=self.CARD, padx=16, pady=16)
+        actions = tk.Frame(self.summary_card, bg=self.CARD, padx=16, pady=12)
         actions.pack(fill="x")
         tk.Button(
             actions,
@@ -288,6 +292,21 @@ class SchedulerApp:
             font=("Segoe UI Semibold", 10),
             cursor="hand2",
         ).pack(fill="x")
+        tk.Button(
+            actions,
+            text="Open Full VM Snapshot",
+            command=self._open_vm_snapshot,
+            bg="#1d4ed8",
+            fg="#ffffff",
+            activebackground="#1e40af",
+            activeforeground="#ffffff",
+            relief="flat",
+            bd=0,
+            padx=26,
+            pady=11,
+            font=("Segoe UI Semibold", 10),
+            cursor="hand2",
+        ).pack(fill="x", pady=(10, 0))
 
     def _build_table_header(self, parent: tk.Widget) -> None:
         columns = [
@@ -313,24 +332,24 @@ class SchedulerApp:
             parent.grid_columnconfigure(index, weight=1)
 
     def _build_chart_stack(self, parent: tk.Widget) -> None:
-        self.chart_makespan = self._chart_card(parent, "Makespan Comparison", 230)
-        self.chart_makespan.pack(fill="x", pady=(0, 16))
-        self.chart_throughput = self._chart_card(parent, "Throughput Comparison", 230)
-        self.chart_throughput.pack(fill="x", pady=(0, 16))
-        self.chart_utilization = self._chart_card(parent, "VM Utilization Snapshot", 430)
+        self.chart_makespan = self._chart_card(parent, "Makespan Comparison", 265)
+        self.chart_makespan.pack(fill="x", pady=(0, 12))
+        self.chart_throughput = self._chart_card(parent, "Throughput Comparison", 265)
+        self.chart_throughput.pack(fill="x", pady=(0, 12))
+        self.chart_utilization = self._chart_card(parent, "VM Utilization Snapshot", 410)
         self.chart_utilization.pack(fill="both", expand=True)
 
-        self.makespan_canvas = self._chart_canvas(self.chart_makespan, width=690, height=230)
-        self.throughput_canvas = self._chart_canvas(self.chart_throughput, width=690, height=230)
-        self.utilization_canvas = self._chart_canvas(self.chart_utilization, width=690, height=430)
+        self.makespan_canvas = self._chart_canvas(self.chart_makespan, width=840, height=265)
+        self.throughput_canvas = self._chart_canvas(self.chart_throughput, width=840, height=265)
+        self.utilization_canvas = self._chart_canvas(self.chart_utilization, width=840, height=410)
 
     def _chart_card(self, parent: tk.Widget, title: str, height: int) -> tk.Frame:
         card = self._card(parent)
         card.pack_propagate(False)
         card.configure(height=height)
-        inner = tk.Frame(card, bg=self.CARD, padx=18, pady=18)
+        inner = tk.Frame(card, bg=self.CARD, padx=18, pady=12)
         inner.pack(fill="both", expand=True)
-        tk.Label(inner, text=title, bg=self.CARD, fg=self.TEXT, font=("Segoe UI Semibold", 13)).pack(anchor="w", pady=(0, 12))
+        tk.Label(inner, text=title, bg=self.CARD, fg=self.TEXT, font=("Segoe UI Semibold", 13)).pack(anchor="w", pady=(0, 8))
         card.inner = inner  # type: ignore[attr-defined]
         return card
 
@@ -517,11 +536,17 @@ class SchedulerApp:
         if not self.latest_results:
             return
         self.root.update_idletasks()
+        self._draw_charts()
+        self.root.after(75, self._draw_charts)
+        self.root.update_idletasks()
+
+    def _draw_charts(self) -> None:
+        if not self.latest_results:
+            return
         self.plotter.draw_algorithm_metric_chart(self.makespan_canvas, self.latest_results, "makespan", "Makespan (s)")
         self.plotter.draw_algorithm_metric_chart(self.throughput_canvas, self.latest_results, "throughput", "Throughput")
         selected = self._active_result() or self.latest_results[0]
         self.plotter.draw_vm_utilization_chart(self.utilization_canvas, selected)
-        self.root.update_idletasks()
 
     def _active_result(self) -> ScheduleResult | None:
         if not self.active_algorithm:
@@ -535,6 +560,13 @@ class SchedulerApp:
         self.active_algorithm = result.algorithm
         self.plotter.show_result_window(self.root, result)
         self._refresh_charts()
+
+    def _open_vm_snapshot(self) -> None:
+        result = self._active_result() or (self.latest_results[0] if self.latest_results else None)
+        if result is None:
+            messagebox.showinfo("No Results", "Run a simulation first to open the VM utilization snapshot.")
+            return
+        self.plotter.show_vm_utilization_window(self.root, result)
 
     def _download_algorithm_csv(self, result: ScheduleResult) -> None:
         default_name = f"{result.algorithm.lower()}_result.csv"
