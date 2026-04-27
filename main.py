@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import tkinter as tk
 
-from config import OUTPUT_CSV, TASKS_CSV, ensure_runtime_paths
+from config import OUTPUT_CSV, TASKS_CSV, enable_dpi_awareness, ensure_runtime_paths
 
 ensure_runtime_paths()
+enable_dpi_awareness()
 
 from dataset.generator import load_tasks_from_csv, generate_tasks_csv
 from scheduler.scheduler import Scheduler
@@ -32,7 +33,7 @@ def main() -> None:
     vms = scheduler.build_vms(count=5, min_mips=500, max_mips=2000)
 
     results = scheduler.run_all(tasks, vms)
-    scheduler.save_results_csv(results)
+    scheduler.save_summary_csv(results, OUTPUT_CSV)
 
     print("Cloud Task Scheduling Simulator")
     print("=" * 40)

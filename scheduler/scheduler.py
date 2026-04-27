@@ -7,6 +7,8 @@ import csv
 
 from algorithms.eft import schedule_eft
 from algorithms.fcfs import schedule_fcfs
+from algorithms.maxmin import schedule_maxmin
+from algorithms.minmin import schedule_minmin
 from algorithms.sjf import schedule_sjf
 from config import OUTPUT_CSV, TASKS_CSV
 from dataset.generator import generate_tasks_csv, load_tasks_from_csv
@@ -31,7 +33,10 @@ class Scheduler:
             "FCFS": schedule_fcfs,
             "SJF": schedule_sjf,
             "EFT": schedule_eft,
+            "Min-Min": schedule_minmin,
+            "Max-Min": schedule_maxmin,
         }
+        self._algorithm_lookup = {name.upper(): name for name in self.algorithm_map}
 
     def build_vms(self, count: int, min_mips: int, max_mips: int) -> list[VM]:
         if count <= 0:
@@ -59,16 +64,18 @@ class Scheduler:
 
     def run(self, tasks: list[Task], vms: list[VM], algorithm: str) -> ScheduleResult:
         algorithm_key = algorithm.upper()
-        if algorithm_key not in self.algorithm_map:
+        if algorithm_key not in self._algorithm_lookup:
             raise ValueError(f"Unsupported algorithm: {algorithm}")
+
+        algorithm_name = self._algorithm_lookup[algorithm_key]
 
         task_copies = [Task(id=task.id, length=task.length, arrival_time=task.arrival_time) for task in tasks]
         vm_copies = [vm.clone() for vm in vms]
-        schedule_fn = self.algorithm_map[algorithm_key]
+        schedule_fn = self.algorithm_map[algorithm_name]
         assignments, scheduled_tasks, scheduled_vms = schedule_fn(task_copies, vm_copies)
         metrics = calculate_metrics(assignments, scheduled_vms)
         return ScheduleResult(
-            algorithm=algorithm_key,
+            algorithm=algorithm_name,
             assignments=assignments,
             tasks=scheduled_tasks,
             vms=scheduled_vms,
@@ -106,5 +113,67 @@ class Scheduler:
                         "; ".join(
                             f"{vm_id}:{util:.4f}" for vm_id, util in result.metrics["vm_utilization"].items()
                         ),
+                    ]
+                )
+
+    def save_summary_csv(self, results: list[ScheduleResult], path: Path) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.writer(handle)
+            writer.writerow(
+                [
+                    "algorithm",
+                    "tasks",
+                    "makespan",
+                    "throughput",
+                    "average_utilization",
+                    "average_waiting_time",
+                    "vm_utilization",
+                ]
+            )
+            for result in results:
+                writer.writerow(
+                    [
+                        result.algorithm,
+                        len(result.assignments),
+                        f"{result.metrics['makespan']:.4f}",
+                        f"{result.metrics['throughput']:.4f}",
+                        f"{result.metrics['average_utilization']:.4f}",
+                        f"{result.metrics['average_waiting_time']:.4f}",
+                        "; ".join(f"{vm_id}:{util:.4f}" for vm_id, util in result.metrics["vm_utilization"].items()),
+                    ]
+                )
+
+    def save_algorithm_csv(self, result: ScheduleResult, path: Path) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.writer(handle)
+            writer.writerow(
+                [
+                    "algorithm",
+                    "task_id",
+                    "vm_id",
+                    "arrival_time",
+                    "length",
+                    "start_time",
+                    "finish_time",
+                    "execution_time",
+                    "waiting_time",
+                ]
+            )
+            tasks_by_id = {task.id: task for task in result.tasks}
+            for assignment in result.assignments:
+                task = tasks_by_id[assignment.task_id]
+                writer.writerow(
+                    [
+                        result.algorithm,
+                        assignment.task_id,
+                        assignment.vm_id,
+                        f"{task.arrival_time:.4f}",
+                        f"{task.length:.4f}",
+                        f"{assignment.start_time:.4f}",
+                        f"{assignment.finish_time:.4f}",
+                        f"{assignment.execution_time:.4f}",
+                        f"{assignment.waiting_time:.4f}",
                     ]
                 )

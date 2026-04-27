@@ -34,6 +34,23 @@ def ensure_runtime_paths() -> None:
     return
 
 
+def enable_dpi_awareness() -> None:
+    """Reduce Windows scaling blur for Tkinter windows when possible."""
+    try:
+        import ctypes
+
+        if hasattr(ctypes, "windll"):
+            try:
+                ctypes.windll.shcore.SetProcessDpiAwareness(1)
+            except Exception:
+                try:
+                    ctypes.windll.user32.SetProcessDPIAware()
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+
 @dataclass(frozen=True)
 class VMConfig:
     count: int = DEFAULT_VM_COUNT
