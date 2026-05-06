@@ -9,12 +9,12 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from config import OUTPUT_CSV, TASKS_CSV, TaskConfig, enable_dpi_awareness, ensure_runtime_paths
+from config import OUTPUT_CSV, TASKS_CSV, DEFAULT_VM_COUNT, DEFAULT_EXPERIMENT_COUNTS, enable_dpi_awareness, ensure_runtime_paths
 
 ensure_runtime_paths()
 enable_dpi_awareness()
 
-from dataset.generator import generate_tasks, generate_tasks_csv, load_tasks_from_csv
+from dataset.generator import load_experiment_tasks
 from scheduler.scheduler import ScheduleResult, Scheduler
 from visualization.plotter import Plotter
 
@@ -51,7 +51,6 @@ class SchedulerApp:
 
         self.selected_count = tk.IntVar(value=500)
         self.custom_count_var = tk.StringVar()
-        self.vm_count_var = tk.IntVar(value=5)
         self.dataset_label_var = tk.StringVar(value=TASKS_CSV.name)
         self.status_var = tk.StringVar(value="Ready to run experiments.")
         self.footer_var = tk.StringVar(value="Task Scheduling Simulator - Research Dashboard")
@@ -61,8 +60,6 @@ class SchedulerApp:
             "FCFS": tk.BooleanVar(value=True),
             "SJF": tk.BooleanVar(value=True),
             "EFT": tk.BooleanVar(value=True),
-            "Min-Min": tk.BooleanVar(value=False),
-            "Max-Min": tk.BooleanVar(value=False),
         }
 
         self._setup_style()
@@ -198,7 +195,7 @@ class SchedulerApp:
         tk.Label(task_col, text="Pick a preset or enter a custom amount.", bg=self.CARD, fg=self.MUTED).pack(anchor="w", pady=(4, 12))
         preset_row = tk.Frame(task_col, bg=self.CARD)
         preset_row.pack(anchor="w")
-        for count in (100, 200, 500, 1000):
+        for count in DEFAULT_EXPERIMENT_COUNTS:
             self._make_task_radio(preset_row, count).pack(side="left", padx=(0, 12))
         custom_row = tk.Frame(task_col, bg=self.CARD)
         custom_row.pack(fill="x", pady=(14, 0))
@@ -222,12 +219,12 @@ class SchedulerApp:
 
         tk.Label(scheduler_col, text="Schedulers", bg=self.CARD, fg=self.TEXT, font=("Segoe UI Semibold", 12)).pack(anchor="w")
         tk.Label(scheduler_col, text="Select the algorithms to compare.", bg=self.CARD, fg=self.MUTED).pack(anchor="w", pady=(4, 12))
-        for algorithm in ("FCFS", "SJF", "EFT", "Min-Min", "Max-Min"):
+        for algorithm in ("FCFS", "SJF", "EFT"):
             ttk.Checkbutton(scheduler_col, text=algorithm, variable=self.algorithm_vars[algorithm]).pack(anchor="w", pady=4)
 
         tk.Label(action_col, text="Resources", bg=self.CARD, fg=self.TEXT, font=("Segoe UI Semibold", 12)).pack(anchor="w")
-        tk.Label(action_col, text="VM Count", bg=self.CARD, fg=self.MUTED).pack(anchor="w", pady=(8, 6))
-        ttk.Spinbox(action_col, from_=1, to=20, textvariable=self.vm_count_var, width=10).pack(anchor="w")
+        tk.Label(action_col, text=f"Fixed datacenter: {DEFAULT_VM_COUNT} VMs", bg=self.CARD, fg=self.MUTED, wraplength=180, justify="left").pack(anchor="w", pady=(8, 10))
+        tk.Label(action_col, text="Run the selected workload", bg=self.CARD, fg=self.MUTED).pack(anchor="w")
         tk.Button(
             action_col,
             text="Run",
@@ -242,7 +239,7 @@ class SchedulerApp:
             pady=12,
             font=("Segoe UI Semibold", 11),
             cursor="hand2",
-        ).pack(anchor="e", pady=(34, 0))
+        ).pack(anchor="e", pady=(26, 0))
 
     def _build_dashboard(self) -> None:
         dashboard = tk.Frame(self.content, bg=self.BG)
@@ -314,7 +311,7 @@ class SchedulerApp:
             ("Tasks", 8),
             ("Makespan(s)", 12),
             ("Throughput", 12),
-            ("Util.", 8),
+            ("Utilization", 12),
             ("Plot", 8),
             ("CSV", 8),
         ]
@@ -420,7 +417,7 @@ class SchedulerApp:
 
     def _load_initial_dataset(self) -> None:
         if not TASKS_CSV.exists():
-            generate_tasks_csv()
+            self.status_var.set("GoCJ dataset not found locally. A compatible sample will be used until a CSV is chosen.")
         self.dataset_label_var.set(TASKS_CSV.name)
 
     def _resolve_task_count(self) -> int:
@@ -442,12 +439,10 @@ class SchedulerApp:
         return algorithms
 
     def _load_tasks_for_run(self, task_count: int):
-        if self.reference_csv_path and self.reference_csv_path.exists():
-            return load_tasks_from_csv(self.reference_csv_path)
-
-        task_config = TaskConfig(count=task_count)
-        tasks = generate_tasks_csv(task_config=task_config)
-        return tasks
+        source = self.reference_csv_path if self.reference_csv_path and self.reference_csv_path.exists() else TASKS_CSV
+        if source.exists():
+            return load_experiment_tasks(task_count, source)
+        return self.scheduler.load_tasks(task_count, source_path=None)
 
     def run_selected_experiments(self) -> None:
         try:
@@ -457,9 +452,9 @@ class SchedulerApp:
             self.root.update_idletasks()
 
             tasks = self._load_tasks_for_run(task_count)
-            vms = self.scheduler.build_vms(self.vm_count_var.get(), 500, 2000)
+            vms = self.scheduler.build_vms()
             self.latest_results = [self.scheduler.run(tasks, vms, algorithm) for algorithm in algorithms]
-            order = ["FCFS", "SJF", "EFT", "Min-Min", "Max-Min"]
+            order = ["FCFS", "SJF", "EFT"]
             self.latest_results.sort(key=lambda result: order.index(result.algorithm) if result.algorithm in order else 99)
             self.scheduler.save_summary_csv(self.latest_results, OUTPUT_CSV)
 
@@ -494,7 +489,7 @@ class SchedulerApp:
                 (len(result.assignments), 8),
                 (f"{result.metrics['makespan']:.3f}", 12),
                 (f"{result.metrics['throughput']:.4f}", 12),
-                (f"{result.metrics['average_utilization']:.3f}", 8),
+                (f"{result.metrics['resource_utilization']:.3f}", 12),
             ]
             for col, (value, width) in enumerate(cells):
                 tk.Label(row, text=value, bg=row_bg, fg=self.TEXT, font=("Segoe UI", 10, "bold" if col == 0 else "normal"), width=width, pady=10).grid(row=0, column=col, sticky="nsew", padx=1)

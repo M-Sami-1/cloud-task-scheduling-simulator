@@ -20,3 +20,12 @@ class Task:
     def turnaround_time(self) -> float:
         return max(0.0, self.finish_time - self.arrival_time)
 
+    def clone(self) -> "Task":
+        return Task(
+            id=self.id,
+            length=self.length,
+            arrival_time=self.arrival_time,
+            start_time=self.start_time,
+            finish_time=self.finish_time,
+            vm_id=self.vm_id,
+        )

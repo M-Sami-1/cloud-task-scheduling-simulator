@@ -10,7 +10,7 @@ def calculate_metrics(assignments: list[Assignment], vms: list[VM]) -> dict[str,
     makespan = max((assignment.finish_time for assignment in assignments), default=0.0)
     throughput = (len(assignments) / makespan) if makespan else 0.0
     vm_utilization = {
-        vm.id: (vm.busy_time / makespan if makespan else 0.0)
+        vm.id: vm.utilization(makespan)
         for vm in vms
     }
     average_utilization = mean(vm_utilization.values()) if vm_utilization else 0.0
@@ -21,5 +21,6 @@ def calculate_metrics(assignments: list[Assignment], vms: list[VM]) -> dict[str,
         "throughput": throughput,
         "vm_utilization": vm_utilization,
         "average_utilization": average_utilization,
+        "resource_utilization": average_utilization,
         "average_waiting_time": average_waiting_time,
     }

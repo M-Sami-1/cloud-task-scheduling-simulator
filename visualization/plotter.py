@@ -152,7 +152,7 @@ class Plotter:
         metric_cards = [
             ("Makespan", f"{result.metrics['makespan']:.3f}"),
             ("Throughput", f"{result.metrics['throughput']:.4f}"),
-            ("Avg Utilization", f"{result.metrics['average_utilization']:.3f}"),
+            ("Resource Utilization", f"{result.metrics['resource_utilization']:.3f}"),
             ("Avg Waiting", f"{result.metrics['average_waiting_time']:.3f}"),
         ]
         for label, value in metric_cards:

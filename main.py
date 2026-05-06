@@ -1,15 +1,11 @@
 from __future__ import annotations
 
-import tkinter as tk
+import argparse
+from pathlib import Path
 
-from config import OUTPUT_CSV, TASKS_CSV, enable_dpi_awareness, ensure_runtime_paths
-
-ensure_runtime_paths()
-enable_dpi_awareness()
-
-from dataset.generator import load_tasks_from_csv, generate_tasks_csv
+from config import DEFAULT_EXPERIMENT_COUNTS, OUTPUT_BATCH_CSV, OUTPUT_BATCH_DETAILS_CSV, OUTPUT_CSV, TASKS_CSV, ensure_runtime_paths
+from dataset.generator import load_experiment_tasks
 from scheduler.scheduler import Scheduler
-from visualization.plotter import Plotter
 
 
 def format_metrics_row(result) -> str:
@@ -17,35 +13,67 @@ def format_metrics_row(result) -> str:
     utilization = ", ".join(f"{vm_id}: {value:.2f}" for vm_id, value in metrics["vm_utilization"].items())
     return (
         f"{result.algorithm:<5} | "
+        f"tasks={len(result.assignments):<4} | "
         f"makespan={metrics['makespan']:.2f} | "
         f"throughput={metrics['throughput']:.4f} | "
-        f"avg_util={metrics['average_utilization']:.2f} | "
-        f"avg_wait={metrics['average_waiting_time']:.2f} | "
+        f"util={metrics['resource_utilization']:.2f} | "
+        f"wait={metrics['average_waiting_time']:.2f} | "
         f"vm_util={utilization}"
     )
 
 
-def main() -> None:
-    scheduler = Scheduler()
-    plotter = Plotter()
-
-    tasks = load_tasks_from_csv() if TASKS_CSV.exists() else generate_tasks_csv()
-    vms = scheduler.build_vms(count=5, min_mips=500, max_mips=2000)
-
+def run_single_experiment(scheduler: Scheduler, task_count: int, dataset_path: Path | None) -> None:
+    tasks = load_experiment_tasks(task_count, dataset_path or TASKS_CSV)
+    vms = scheduler.build_vms()
     results = scheduler.run_all(tasks, vms)
     scheduler.save_summary_csv(results, OUTPUT_CSV)
 
-    print("Cloud Task Scheduling Simulator")
-    print("=" * 40)
+    print(f"Task count: {task_count}")
+    print(f"Dataset: {(dataset_path or TASKS_CSV).resolve()}")
     for result in results:
         print(format_metrics_row(result))
-    print("=" * 40)
-    print(f"Results saved to: {OUTPUT_CSV.resolve()}")
+    print(f"Summary saved to: {OUTPUT_CSV.resolve()}")
 
-    root = tk.Tk()
-    root.withdraw()
-    plotter.show_results_window(root, results, results[0].algorithm)
-    root.mainloop()
+
+def run_batch_experiment(scheduler: Scheduler, task_counts: tuple[int, ...], dataset_path: Path | None) -> None:
+    batch_results = scheduler.run_experiment_suite(list(task_counts), source_path=dataset_path or TASKS_CSV)
+    scheduler.save_batch_summary_csv(batch_results, OUTPUT_BATCH_CSV)
+    scheduler.save_batch_details_csv(batch_results, OUTPUT_BATCH_DETAILS_CSV)
+
+    print("Batch experiment completed.")
+    for task_count in task_counts:
+        print(f"\nTask count: {task_count}")
+        for result in batch_results[task_count]:
+            print(format_metrics_row(result))
+
+    print(f"\nBatch summary saved to: {OUTPUT_BATCH_CSV.resolve()}")
+    print(f"Batch details saved to: {OUTPUT_BATCH_DETAILS_CSV.resolve()}")
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Cloud task scheduling simulator")
+    parser.add_argument(
+        "--task-count",
+        type=int,
+        help="Run a single experiment with the requested number of tasks.",
+    )
+    parser.add_argument(
+        "--dataset",
+        type=Path,
+        help="Optional path to a GoCJ CSV file or compatible task dataset.",
+    )
+    return parser.parse_args()
+
+
+def main() -> None:
+    ensure_runtime_paths()
+    args = parse_args()
+    scheduler = Scheduler()
+
+    if args.task_count is not None:
+        run_single_experiment(scheduler, args.task_count, args.dataset)
+    else:
+        run_batch_experiment(scheduler, DEFAULT_EXPERIMENT_COUNTS, args.dataset)
 
 
 if __name__ == "__main__":
